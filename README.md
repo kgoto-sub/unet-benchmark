@@ -1,1 +1,11 @@
-# unet-benchmark
+# U-Net benchmark
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -U pip
+pip install -r requirements.txt
+
+python train.py
+```

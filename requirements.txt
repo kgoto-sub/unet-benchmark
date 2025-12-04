@@ -1,0 +1,11 @@
+numpy
+
+opencv-python
+scikit-learn
+
+torch
+monai[all]
+
+tqdm
+black
+isort
