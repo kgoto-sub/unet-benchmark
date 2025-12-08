@@ -9,3 +9,5 @@ monai[all]
 tqdm
 black
 isort
+
+kagglehub
