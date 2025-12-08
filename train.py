@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
@@ -115,6 +116,11 @@ def save_prediction_sample(
     plt.axis("off")
 
     plt.tight_layout()
+
+    output_dir = os.path.dirname(filename)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     plt.savefig(filename)
     plt.close()
     print(f"Saved visualization to {filename}")
