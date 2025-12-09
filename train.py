@@ -90,6 +90,11 @@ def train_and_evaluate(model_name, model, train_loader, device):
     # to_onehot_y=True：ラベルをone-hotの形式に変換
     # softmax=True：出力にsoftmax関数化してから計算
 
+    '''
+    softmax関数：値の集合（スコア）を 0〜1 の確率に変換し、合計を 1 にする関数。
+    値をeの何乗という形に変換し、それを総スコアで割るもの。この値がおこる確率として使用できる。
+    '''
+
     # パラメータの調整
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     # optim：アルゴリズムを最適化
