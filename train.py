@@ -154,7 +154,7 @@ def save_prediction_sample(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SIZE = (256, 256)
-    BATCH_SIZE = 4
+    BATCH_SIZE = 16
 
     train_files = get_file_paths(root_dir="Dataset_BUSI_with_GT")
     train_ds = SimpleDataset(train_files, img_size=IMG_SIZE)
