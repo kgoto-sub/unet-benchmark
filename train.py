@@ -176,8 +176,8 @@ if __name__ == "__main__":
     train_and_evaluate("CIS-UNet (SwinUNETR)", swin_model, train_loader, device)
 
     save_prediction_sample(
-        unet_model, train_loader, device, "./data/unet_prediction.png", "Standard U-Net"
+        unet_model, train_loader, device, "./output/unet_prediction.png", "Standard U-Net"
     )
     save_prediction_sample(
-        swin_model, train_loader, device, "./data/cis_unet_prediction.png", "CIS-UNet"
+        swin_model, train_loader, device, "./output/cis_unet_prediction.png", "CIS-UNet"
     )
