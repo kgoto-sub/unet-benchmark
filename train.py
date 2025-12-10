@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 from torchvision import transforms
 
-# 3
 class SimpleDataset(Dataset):
     def __init__(self, data, img_size=(256, 256)):
         self.data = data
@@ -68,7 +67,6 @@ def get_file_paths(root_dir="Dataset_BUSI_with_GT"):
                 data_list.append({"image": image_path, "label": mask_path})
 
     return data_list
-
 
 def train_and_evaluate(model_name, model, train_loader, device):
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
@@ -146,15 +144,11 @@ def save_prediction_sample(
     plt.close()
     print(f"Saved visualization to {filename}")
 
-
-
-# 1
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SIZE = (256, 256) 
     BATCH_SIZE = 4
 
-    # 1.1
     train_files = get_file_paths(root_dir="Dataset_BUSI_with_GT") 
     train_ds = SimpleDataset(train_files, img_size=IMG_SIZE)
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
