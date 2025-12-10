@@ -7,44 +7,69 @@ from monai.metrics import DiceMetric
 from monai.networks.nets import SwinUNETR, UNet
 from torch.utils.data import DataLoader, Dataset
 
+# 画像読み込みに必要なライブラリ
+from PIL import Image
+from torchvision import transforms
+
 
 class SimpleDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, img_size=(256, 256)):
         self.data = data
+
+        # 画像とマスクをテンソルに変換し、指定サイズにリサイズ
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(img_size),
+                transforms.ToTensor(),  # PIL Imageを[C, H, W]形式のTensorに変換し、値を[0.0, 1.0]に正規化
+            ]
+        )
+        # マスクのバイナリ化は__getitem__内で個別に行う
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        item = self.data[idx]
+
+        # 画像の読み込み: グレースケール("L")で読み込み
+        img_path = item["image"]
+        image = Image.open(img_path).convert("L")
+
+        # ラベル/マスクの読み込み: グレースケール("L")で読み込み
+        label_path = item["label"]
+        label = Image.open(label_path).convert("L")
+
+        # 変換を適用
+        image_tensor = self.transform(image)
+        label_tensor = self.transform(label)
+
+        # マスクはセグメンテーションのため、値を0または1に変換 (二値化)
+        label_tensor = (label_tensor > 0.5).float()
+
+        return {"image": image_tensor, "label": label_tensor}
 
 
-def get_dummy_data(num_samples=50, img_size=(96, 96)):
+def get_file_paths(root_dir="Dataset_BUSI_with_GT"):
     data_list = []
-    H, W = img_size
 
-    for _ in range(num_samples):
-        # 1. 背景: 弱いノイズ (0.0を中心に分散0.1程度)
-        img = torch.randn(1, H, W) * 0.1
-        # 2. ラベル: 全て0で初期化
-        lbl = torch.zeros(1, H, W)
+    for sub_dir in ["benign", "malignant", "normal"]:
+        current_dir = os.path.join(root_dir, sub_dir)
+        files = os.listdir(current_dir)
 
-        # 3. ランダムな四角形を作成
-        # 四角のサイズ (10px ~ 40px)
-        rh = torch.randint(10, 40, (1,)).item()
-        rw = torch.randint(10, 40, (1,)).item()
+        # マスクファイルでない画像ファイル (.png) を抽出
+        image_files = sorted(
+            [f for f in files if not f.endswith("_mask.png") and f.endswith(".png")]
+        )
 
-        # 四角の左上座標 (はみ出さないように計算)
-        y = torch.randint(0, H - rh, (1,)).item()
-        x = torch.randint(0, W - rw, (1,)).item()
+        for image_name in image_files:
+            base_name = image_name.replace(".png", "")
+            mask_name = base_name + "_mask.png"
 
-        # 画像: 四角の領域の輝度を上げる (+1.0)
-        img[0, y : y + rh, x : x + rw] += 1.0
+            image_path = os.path.join(current_dir, image_name)
+            mask_path = os.path.join(current_dir, mask_name)
 
-        # ラベル: 四角の領域を正解(1)にする
-        lbl[0, y : y + rh, x : x + rw] = 1.0
-
-        data_list.append({"image": img, "label": lbl})
+            if os.path.exists(mask_path):
+                data_list.append({"image": image_path, "label": mask_path})
 
     return data_list
 
@@ -58,7 +83,7 @@ def train_and_evaluate(model_name, model, train_loader, device):
     model.train()
 
     print(f"--- Training {model_name} ---")
-    for epoch in range(10):  # デモ用に短く設定
+    for epoch in range(50):
         epoch_loss = 0
         for batch in train_loader:
             inputs, labels = batch["image"].to(device), batch["label"].to(device)
@@ -129,10 +154,10 @@ def save_prediction_sample(
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SIZE = (256, 256)
-    BATCH_SIZE = 4
+    BATCH_SIZE = 16
 
-    train_files = get_dummy_data(img_size=IMG_SIZE)
-    train_ds = SimpleDataset(train_files)
+    train_files = get_file_paths(root_dir="Dataset_BUSI_with_GT")
+    train_ds = SimpleDataset(train_files, img_size=IMG_SIZE)
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
 
     unet_model = UNet(
@@ -152,8 +177,12 @@ if __name__ == "__main__":
     train_and_evaluate("CIS-UNet (SwinUNETR)", swin_model, train_loader, device)
 
     save_prediction_sample(
-        unet_model, train_loader, device, "./data/unet_prediction.png", "Standard U-Net"
+        unet_model,
+        train_loader,
+        device,
+        "./output/unet_prediction.png",
+        "Standard U-Net",
     )
     save_prediction_sample(
-        swin_model, train_loader, device, "./data/cis_unet_prediction.png", "CIS-UNet"
+        swin_model, train_loader, device, "./output/cis_unet_prediction.png", "CIS-UNet"
     )
