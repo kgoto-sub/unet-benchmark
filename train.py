@@ -83,7 +83,7 @@ def train_and_evaluate(model_name, model, train_loader, device):
     model.train()
 
     print(f"--- Training {model_name} ---")
-    for epoch in range(1):
+    for epoch in range(50):
         epoch_loss = 0
         for batch in train_loader:
             inputs, labels = batch["image"].to(device), batch["label"].to(device)
