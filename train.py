@@ -7,6 +7,9 @@ from monai.metrics import DiceMetric
 from monai.networks.nets import SwinUNETR, UNet
 from torch.utils.data import DataLoader, Dataset
 
+# train, testの分割をランダムにするために導入
+import random 
+
 # 画像読み込みに必要なライブラリ
 from PIL import Image
 from torchvision import transforms
@@ -73,15 +76,25 @@ def get_file_paths(root_dir="Dataset_BUSI_with_GT"):
 
     return data_list
 
+# データをトレインとテストに分割
+def train_test_split(data_list, test_size=0.2, seed=42):
+    random.seed(seed)
+    random.shuffle(data_list)
+    test_count = int(len(data_list) * test_size)
+    train_data = data_list[test_count:]
+    test_data = data_list[:test_count]
+    return train_data, test_data
 
-def train_and_evaluate(model_name, model, train_loader, device):
+# train_and_evaluate関数 -> rain_test_and_evaluate関数としてテスト評価項目を追加
+def train_test_and_evaluate(model_name, model, train_loader, test_loader, device):
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     dice_metric = DiceMetric(include_background=False, reduction="mean")
 
     model.to(device)
-    model.train()
 
+    # train
+    model.train()
     print(f"--- Training {model_name} ---")
     for epoch in range(50):
         epoch_loss = 0
@@ -93,19 +106,23 @@ def train_and_evaluate(model_name, model, train_loader, device):
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-        print(f"Epoch {epoch+1}: Loss = {epoch_loss/len(train_loader):.4f}")
+        print(f"Epoch {epoch+1}: Train Loss = {epoch_loss/len(train_loader):.4f}")
 
+    # test
     model.eval()
+    print(f"--- Evaluating {model_name} on Test Set ---")
     with torch.no_grad():
-        for batch in train_loader:
+        for batch in test_loader:
             inputs, labels = batch["image"].to(device), batch["label"].to(device)
             outputs = model(inputs)
-            outputs = torch.argmax(outputs, dim=1, keepdim=True)
+            outputs = torch.argmax(outputs, dim=1, keepdim=True) 
             dice_metric(y_pred=outputs, y=labels)
 
     score = dice_metric.aggregate().item()
     dice_metric.reset()
-    print(f"{model_name} Final Dice Score: {score:.4f}\n")
+    print(f"{model_name} Final Test Dice Score: {score:.4f}\n")
+    return score
+# ----------------------------------------------------
 
 
 def save_prediction_sample(
@@ -117,7 +134,8 @@ def save_prediction_sample(
 
     with torch.no_grad():
         output = model(img)
-        pred = torch.argmax(output, dim=1)
+        # out_channels=2から最も確率の高いクラス (0 or 1) を取得
+        pred = torch.argmax(output, dim=1) 
 
     img_np = img[0, 0].cpu().numpy()
     label_np = label[0, 0].cpu().numpy()
@@ -156,9 +174,16 @@ if __name__ == "__main__":
     IMG_SIZE = (256, 256)
     BATCH_SIZE = 16
 
-    train_files = get_file_paths(root_dir="Dataset_BUSI_with_GT")
+    # --- 変更点 3: データのロードと分割 ---
+    all_files = get_file_paths(root_dir="Dataset_BUSI_with_GT")
+    train_files, test_files = train_test_split(all_files, test_size=0.2) 
+
     train_ds = SimpleDataset(train_files, img_size=IMG_SIZE)
+    test_ds = SimpleDataset(test_files, img_size=IMG_SIZE) 
+    
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False) # テストはシャッフル不要
+    # ------------------------------------
 
     unet_model = UNet(
         spatial_dims=2,
@@ -173,16 +198,24 @@ if __name__ == "__main__":
         in_channels=1, out_channels=2, feature_size=24, spatial_dims=2
     )
 
-    train_and_evaluate("Standard U-Net", unet_model, train_loader, device)
-    train_and_evaluate("CIS-UNet (SwinUNETR)", swin_model, train_loader, device)
+    # --- 変更点 4: train_and_evaluateの引数にtest_loaderを追加 ---
+    unet_score = train_test_and_evaluate("Standard U-Net", unet_model, train_loader, test_loader, device)
+    swin_score = train_test_and_evaluate("CIS-UNet (SwinUNETR)", swin_model, train_loader, test_loader, device)
+    # --------------------------------------------------------
 
+    # 結果の比較
+    print("\n--- Final Test Scores ---")
+    print(f"Standard U-Net Dice Score: {unet_score:.4f}")
+    print(f"CIS-UNet (SwinUNETR) Dice Score: {swin_score:.4f}")
+
+    # --- 変更点 5: 予測サンプルの生成にtest_loaderを使用 ---
     save_prediction_sample(
         unet_model,
-        train_loader,
+        test_loader, # テストデータでの予測を表示
         device,
         "./output/unet_prediction.png",
         "Standard U-Net",
     )
     save_prediction_sample(
-        swin_model, train_loader, device, "./output/cis_unet_prediction.png", "CIS-UNet"
+        swin_model, test_loader, device, "./output/cis_unet_prediction.png", "CIS-UNet" # テストデータでの予測を表示
     )
