@@ -6,8 +6,6 @@ from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import SwinUNETR, UNet
 from torch.utils.data import DataLoader, Dataset
-
-# train, testの分割をランダムにするために導入
 import random
 
 # 画像読み込みに必要なライブラリ
@@ -77,7 +75,6 @@ def get_file_paths(root_dir="Dataset_BUSI_with_GT"):
     return data_list
 
 
-# データをトレインとテストに分割
 def train_test_split(data_list, test_size=0.2, seed=42):
     random.seed(seed)
     random.shuffle(data_list)
@@ -213,7 +210,7 @@ if __name__ == "__main__":
     # 予測サンプルの生成にtest_loaderを使用
     save_prediction_sample(
         unet_model,
-        test_loader,  # テストデータでの予測を表示
+        test_loader,
         device,
         "./output/unet_prediction.png",
         "Standard U-Net",
@@ -223,5 +220,5 @@ if __name__ == "__main__":
         test_loader,
         device,
         "./output/cis_unet_prediction.png",
-        "CIS-UNet",  # テストデータでの予測を表示
+        "CIS-UNet",
     )
