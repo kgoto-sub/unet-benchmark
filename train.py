@@ -86,8 +86,6 @@ def train_test_split(data_list, test_size=0.2, seed=42):
     test_data = data_list[:test_count]
     return train_data, test_data
 
-
-# train_and_evaluate関数 -> rain_test_and_evaluate関数としてテスト評価項目を追加
 def train_test_and_evaluate(model_name, model, train_loader, test_loader, device):
     loss_function = DiceLoss(to_onehot_y=True, softmax=True)
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
